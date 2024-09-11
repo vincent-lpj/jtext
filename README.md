@@ -1,0 +1,2 @@
+# jtext
+ Japan textual characteristics.
