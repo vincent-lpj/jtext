@@ -24,7 +24,7 @@ class JText:
         for item in raw_text_list:
             sub_clean_text = self.preprocess_text(item)
             sub_wakati = self.parse_text(sub_clean_text)[1:-2]
-            if len(wakati) > 100:
+            if len(sub_wakati) > 100:
                 wakati += sub_wakati
                 if sub_clean_text.endswith("。"):
                     clean_text += sub_clean_text
@@ -80,10 +80,10 @@ class JText:
                     word_origin = feature[12]
                 except IndexError:
                     pass
-                else:
-                    pass
-                if word_origin == "漢": kan_count += 1          # add one if it is Chinese character
-                if word_origin == "和": wa_count += 1           # add one if it is from wago
+                else:       # proceed only it has features columns of No. 13 (the 12nd in the list)
+                    if word_origin == "漢": kan_count += 1          # add one if it is Chinese character
+                    if word_origin == "和": wa_count += 1           # add one if it is from wago
+
             else:
                 if feature[0] == "補助記号" and feature[1] == "句点" : 
                     sent_count += 1                     # add the sentence count if there is a period
@@ -92,11 +92,12 @@ class JText:
 
         sent_count += 1 if sent_count == 0 else 0       # set sentence count as 1 if no periods
 
+        # the ratio is multiplied by 100 here, not sure if it is in line with Li(2016)
         avg_len = word_count/sent_count
-        verb_ratio = verb_count/word_count  
-        adverb_ratio = adverb_count/word_count  
-        kan_ratio = kan_count/word_count  
-        wa_ratio = wa_count/word_count  
+        verb_ratio = (verb_count/word_count) * 100 
+        adverb_ratio = (adverb_count/word_count)   * 100 
+        kan_ratio = (kan_count/word_count)  * 100 
+        wa_ratio = (wa_count/word_count)  * 100 
         # Li(2016)
         readability = (-0.056*avg_len) + (-0.126*kan_ratio)+ (-0.042* wa_ratio)+ (-0.145*verb_ratio) + (-0.044*adverb_ratio) + 11.724
 
@@ -106,8 +107,11 @@ class JText:
                 if feature[0] == "BOS/EOS": 
                     pass
                 else:
-                    sub_detail_turple = (feature[7], feature[6], f"{feature[0]}-{feature[1]}-{feature[2]}-{feature[3]}")
-                    detail_list.append(sub_detail_turple)
+                    if len(feature) >= 8:       # get rid of mainly ['名詞', '数詞', '*', '*', '*', '*'], ['名詞', '普通名詞', '一般', '*', '*', '*'], ['補助記号', '一般', '*', '*', '*', '*'], 
+                        sub_detail_turple = (feature[7], feature[6], f"{feature[0]}-{feature[1]}-{feature[2]}-{feature[3]}")
+                        detail_list.append(sub_detail_turple)
+                    else:
+                        pass
             detail_counter = Counter(detail_list)
             for key in detail_counter:
                 print(key, detail_counter[key])
