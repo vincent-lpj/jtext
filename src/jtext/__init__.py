@@ -1,1 +1,1 @@
-from .tools import Jtext
+from .tools import JText
