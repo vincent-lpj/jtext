@@ -6,9 +6,10 @@ from collections import Counter
 class JText:
     def __init__(self, text: str) -> None:
         if text.endswith(".csv"):
-            self.clean_text, self.wakati = self.parse_annual_csv(text)
+            self.sections, self.clean_text, self.wakati = self.parse_annual_csv(text)
         else:
             text += "。" if not text.endswith("。") else  ""
+            self.sections = None
             self.clean_text = self.preprocess_text(text)       # remove whitespace, etc.
             self.wakati = self.parse_text(self.clean_text)              # save parsed words in a list, each list consists of its feature
 
@@ -19,6 +20,7 @@ class JText:
         df = df.drop_duplicates(subset = "項目名")
         raw_text_list = df["値"].to_list()
 
+        sections = []
         clean_text = ""
         wakati = []
         for item in raw_text_list:
@@ -28,12 +30,14 @@ class JText:
                 wakati += sub_wakati
                 if sub_clean_text.endswith("。"):
                     clean_text += sub_clean_text
+                    sections.append(sub_clean_text)
                 else:
                     clean_text = clean_text + sub_clean_text + "。"
+                    sections.append(sub_clean_text + "。")
             else:
                 pass
 
-        return clean_text, wakati
+        return sections, clean_text, wakati
 
     def preprocess_text(self, raw_text):
         clean_text = re.sub(r'\s','',raw_text)     # remove all whitespace characters
@@ -43,14 +47,14 @@ class JText:
         return clean_text
     
     def parse_text(self, clean_text):
-        watati = []
+        wakati = []
         tagger = MeCab.Tagger()
         nodes = tagger.parseToNode(clean_text)           # can not save as self.nodes, do not know why
         while nodes:
             segment = nodes.feature.split(",")
-            watati.append(segment)
+            wakati.append(segment)
             nodes = nodes.next
-        return watati
+        return wakati
 
     
     def get_length(self):
@@ -124,4 +128,70 @@ class JText:
             pass
 
         return readability
+
+    def get_redundancy(self, words_per_pharse: int = 8, print_detail: bool = False, detail_section: int = 0):
+        tagger = MeCab.Tagger()
+        n_gram = []
+        count = 0
+        for section in self.sections:
+            count += 1
+            sub_wakati = []
+            nodes = tagger.parseToNode(section)           # can not save as self.nodes, do not know why
+            while nodes:
+                segment = nodes.feature.split(",")
+                sub_wakati.append(segment)
+                nodes = nodes.next
+            sub_wakati = sub_wakati[1:-2]
+
+            sub_n_gram_list = []
+            for k in range(len(sub_wakati) - words_per_pharse + 1):
+                if len(sub_wakati[k]) < 9:
+                    pass
+                else:
+                    phrase = ""
+                    for i in range(words_per_pharse):
+                        try:
+                            phrase += sub_wakati[k+i][8]
+                        except IndexError:
+                            phrase = ""
+                            break
+                        except:
+                            pass
+                        else:
+                            pass
+                    if phrase != "":
+                        sub_n_gram_list.append(phrase)
+
+            sub_n_gram = Counter(sub_n_gram_list)
+            n_gram.append(sub_n_gram)
+
+            if print_detail == True:
+                if detail_section == count:
+                    print("\n")
+                    print(f"The original text: \n{section}")
+                    print("\n")
+                    print(f"{words_per_pharse}-gram phrases list: \n{sub_n_gram_list}")
+                    print("\n")
+                    print(f"The unique {words_per_pharse}-gram phrases are: \n{sub_n_gram}")
+            else:
+                pass
+        
+        common_n_gram = Counter()
+
+        for sub_n_gram in n_gram:
+            common_n_gram.update(sub_n_gram)
+            total_n_gram = common_n_gram.total()
+
+        for sub_n_gram in n_gram:
+            for key in sub_n_gram.keys():
+                if key in common_n_gram and common_n_gram[key] ==  sub_n_gram[key]:
+                    common_n_gram.pop(key)
+            redundant_n_gram = common_n_gram.total()
+        if print_detail == True:
+            print("\n")
+            print(f"The redundant count is as follows: \n{common_n_gram}")
+
+        redundant_ratio = redundant_n_gram/total_n_gram
+
+        return redundant_ratio
 
