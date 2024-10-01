@@ -144,6 +144,11 @@ class JText:
         n_gram = []
         count = 0
         # loop textblocks saved in self.sections and get word features lists
+        if self.sections == None:
+            return 0
+        else:
+            pass
+        
         for section in self.sections:
             count += 1
             sub_wakati = []
