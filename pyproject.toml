@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jtext"
+dynamic = ["version"]
+decsription = "Tool for measurement of Japanese text features"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = ["Japanese","readability","redundancy","length"]
+authors = [
+  { name = "Peijun Liu", email = "vincentlpj.ou@gmail.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = ["mecab-python3", "pandas", "unidic"]
+
+[project.urls]
+Source = "https://github.com/vincent-lpj/jtext"
+
+
+[tool.hatch.version]
+path = "src/jtext/__about__.py"
+
+[tool.coverage.run]
+source_pkgs = ["jtext"]
+branch = true
+parallel = true
+omit = [
+  "src/jtext/__about__.py",
+]
+
+[tool.coverage.paths]
+jtext = ["src/jtext", "*/JTEXT/src/jtext"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
