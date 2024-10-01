@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "jtext"
 dynamic = ["version"]
-decsription = "Tool for measurement of Japanese text features"
+description = "Tool for measurement of Japanese text features"
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
