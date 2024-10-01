@@ -5,15 +5,19 @@ from collections import Counter
 
 class JText:
     def __init__(self, text: str) -> None:
+        """Create an instance of JText class.
+        """
         if text.endswith(".csv"):
             self.sections, self.clean_text, self.wakati = self.parse_annual_csv(text)
         else:
-            text += "。" if not text.endswith("。") else  ""
+            text += "。" if not text.endswith("。") else  ""            # add a period if there is no period at the end
             self.sections = None
-            self.clean_text = self.preprocess_text(text)       # remove whitespace, etc.
+            self.clean_text = self.preprocess_text(text)                # remove whitespace, etc.
             self.wakati = self.parse_text(self.clean_text)              # save parsed words in a list, each list consists of its feature
 
-    def parse_annual_csv(self, text): 
+    def parse_annual_csv(self, text) -> tuple[list,str,list]: 
+        """Parse annual report in csv format. 
+        """
         df = pd.read_csv(text,encoding='utf-16',on_bad_lines='skip', sep = "\t")
         df = df.loc[-df["値"].str.isdigit()]
         df = df.loc[df['要素ID'].str.contains("TextBlock")]
@@ -25,9 +29,10 @@ class JText:
         wakati = []
         for item in raw_text_list:
             sub_clean_text = self.preprocess_text(item)
-            sub_wakati = self.parse_text(sub_clean_text)[1:-2]
-            if len(sub_wakati) > 100:
+            sub_wakati = self.parse_text(sub_clean_text)[1:-2]          # slice the list by [1:-2] to get rid of BOS/EOS
+            if len(sub_wakati) > 100:                                   # include only textblock that exceeds 100 words
                 wakati += sub_wakati
+                # add period to each textblock 
                 if sub_clean_text.endswith("。"):
                     clean_text += sub_clean_text
                     sections.append(sub_clean_text)
@@ -37,36 +42,40 @@ class JText:
             else:
                 pass
 
-        return sections, clean_text, wakati
+        return sections, clean_text, wakati                             # return list(of textblocks), str, list(of words features)
 
-    def preprocess_text(self, raw_text):
-        clean_text = re.sub(r'\s','',raw_text)     # remove all whitespace characters
-        clean_text = re.sub(r'<.*?>','',clean_text)     # remove all HTML or XML-like tags 
-        clean_text = re.sub(r"[\r\n]", "", clean_text)  # remove newline characters
+    def preprocess_text(self, raw_text) -> str:
+        clean_text = re.sub(r'\s','',raw_text)                          # remove all whitespace characters
+        clean_text = re.sub(r'<.*?>','',clean_text)                     # remove all HTML or XML-like tags 
+        clean_text = re.sub(r"[\r\n]", "", clean_text)                  # remove newline characters
         clean_text = re.sub(r"[\u3000 \t \xa0]", " ", clean_text)
-        return clean_text
+        return clean_text                                               # return str
     
-    def parse_text(self, clean_text):
+    def parse_text(self, clean_text) -> list:
         wakati = []
         tagger = MeCab.Tagger()
-        nodes = tagger.parseToNode(clean_text)           # can not save as self.nodes, do not know why
+        nodes = tagger.parseToNode(clean_text)                          # can not save as self.nodes, do not know why
         while nodes:
-            segment = nodes.feature.split(",")
+            segment = nodes.feature.split(",")                          # segment is list of word features
             wakati.append(segment)
             nodes = nodes.next
         return wakati
 
     
-    def get_length(self):
+    def get_length(self) -> int:
         length = 0
         for feature in self.wakati:
-            if feature[0] not in ["BOS/EOS", "補助記号"]:
+            # count with conditions, the first (index 0) element in the feature list is the target. see pos1 in https://pypi.org/project/unidic/
+            if feature[0] not in ["BOS/EOS", "補助記号"]:               
                 length += 1
             else: 
                 pass
-        return length
+        return length                                                   # return interger
     
-    def get_readability(self, print_detail: bool = False):
+    def get_readability(self, print_detail: bool = False) -> float:
+        """This follows the formula in Li(2006):
+         readability = number of words per sentence * -0.056 + proportion of kango * -0.126 + proportion of wago * -0.042 + proportion of verbs * -0.145 + proportion of auxiliaries * -0.044 + 11.724
+        """
         word_count = 0
         sent_count = 0
         kan_count = 0
@@ -75,26 +84,26 @@ class JText:
         adverb_count = 0
 
         for feature in self.wakati:
-            if feature[0] not in ["BOS/EOS","補助記号"]:     # remove BOS/EOS, and periods, etc.
-                word_count += 1                             # add one to total length
+            if feature[0] not in ["BOS/EOS","補助記号"]:                # remove BOS/EOS, and periods, etc.
+                word_count += 1                                         # add one to total length
                 word_class = feature[0]
-                if word_class == "動詞": verb_count += 1        # add one if it is verb
-                if word_class == "助詞": adverb_count += 1      # add one if it is adverb
+                if word_class == "動詞": verb_count += 1                # add one if it is verb
+                if word_class == "助詞": adverb_count += 1              # add one if it is adverb
                 try:
                     word_origin = feature[12]
                 except IndexError:
                     pass
-                else:       # proceed only it has features columns of No. 13 (the 12nd in the list)
-                    if word_origin == "漢": kan_count += 1          # add one if it is Chinese character
-                    if word_origin == "和": wa_count += 1           # add one if it is from wago
+                else:                                                   # proceed only it has features columns of No. 13 (the 12nd in the list)
+                    if word_origin == "漢": kan_count += 1              # add one if it is Chinese character(kango)
+                    if word_origin == "和": wa_count += 1               # add one if it is from wago
 
             else:
                 if feature[0] == "補助記号" and feature[1] == "句点" : 
-                    sent_count += 1                     # add the sentence count if there is a period
+                    sent_count += 1                                     # add the sentence count if there is a period
                 else:
                     pass
 
-        sent_count += 1 if sent_count == 0 else 0       # set sentence count as 1 if no periods
+        sent_count += 1 if sent_count == 0 else 0                       # set sentence count as 1 if no periods
 
         # the ratio is multiplied by 100 here, not sure if it is in line with Li(2016)
         avg_len = word_count/sent_count
@@ -105,13 +114,14 @@ class JText:
         # Li(2016)
         readability = (-0.056*avg_len) + (-0.126*kan_ratio)+ (-0.042* wa_ratio)+ (-0.145*verb_ratio) + (-0.044*adverb_ratio) + 11.724
 
+        # Show details if needed 
         if print_detail == True:
             detail_list = []
             for feature in self.wakati:
                 if feature[0] == "BOS/EOS": 
                     pass
                 else:
-                    if len(feature) >= 8:       # get rid of mainly ['名詞', '数詞', '*', '*', '*', '*'], ['名詞', '普通名詞', '一般', '*', '*', '*'], ['補助記号', '一般', '*', '*', '*', '*'], 
+                    if len(feature) >= 8:                               # get rid of mainly ['名詞', '数詞', '*', '*', '*', '*'], ['名詞', '普通名詞', '一般', '*', '*', '*'], ['補助記号', '一般', '*', '*', '*', '*'], 
                         sub_detail_turple = (feature[7], feature[6], f"{feature[0]}-{feature[1]}-{feature[2]}-{feature[3]}")
                         detail_list.append(sub_detail_turple)
                     else:
@@ -129,14 +139,15 @@ class JText:
 
         return readability
 
-    def get_redundancy(self, words_per_pharse: int = 8, print_detail: bool = False, detail_section: int = 0):
+    def get_redundancy(self, words_per_pharse: int = 8, print_detail: bool = False, detail_section: int = 0) -> float:
         tagger = MeCab.Tagger()
         n_gram = []
         count = 0
+        # loop textblocks saved in self.sections and get word features lists
         for section in self.sections:
             count += 1
             sub_wakati = []
-            nodes = tagger.parseToNode(section)           # can not save as self.nodes, do not know why
+            nodes = tagger.parseToNode(section)                         # can not save as self.nodes, do not know why
             while nodes:
                 segment = nodes.feature.split(",")
                 sub_wakati.append(segment)
@@ -151,7 +162,7 @@ class JText:
                     phrase = ""
                     for i in range(words_per_pharse):
                         try:
-                            phrase += sub_wakati[k+i][8]
+                            phrase += sub_wakati[k+i][8]                # the 9th (index 8) element of a feature list contains orth:  the word as it appears in text, this appears to be identical to the surface.
                         except IndexError:
                             phrase = ""
                             break
