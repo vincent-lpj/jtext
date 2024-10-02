@@ -5,6 +5,7 @@ from collections import Counter
 import requests
 import os
 import json
+# note unidic should be installed before use
 
 class JText:
     def __init__(self, text: str) -> None:
@@ -142,6 +143,30 @@ class JText:
             pass
 
         return readability
+    
+    def get_ngram(self, words_per_phrase:int = 8) -> list[str]:
+        n_gram_list = []
+        wakati_list = self.wakati[1:-1]
+        for k in range(len(wakati_list)):
+            if len(wakati_list[k]) < 9 or wakati_list[k][0] == "補助記号":
+                pass
+            else:
+                phrase = ""
+                for i in range(words_per_phrase):
+                    try:
+                        phrase += wakati_list[k+i][8]                # the 9th (index 8) element of a feature list contains orth:  the word as it appears in text, this appears to be identical to the surface.
+                    except IndexError:
+                        phrase = ""
+                        break
+                    except:
+                        pass
+                    else:
+                        pass
+                if phrase != "":
+                    n_gram_list.append(phrase)
+                else:
+                    pass
+        return n_gram_list
 
     def get_redundancy(self, words_per_pharse: int = 8, print_detail: bool = False, detail_section: int = 0) -> float:
         tagger = MeCab.Tagger()
@@ -294,4 +319,4 @@ class JText:
             specific_ratio = specificity/length
 
         return specific_ratio
-    
+   
