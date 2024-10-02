@@ -1,7 +1,10 @@
 import re
-import MeCab   # Notice the capitalized M and C
+import MeCab        # Notice the capitalized M and C
 import pandas as pd
 from collections import Counter
+import requests
+import os
+import json
 
 class JText:
     def __init__(self, text: str) -> None:
@@ -51,7 +54,8 @@ class JText:
         clean_text = re.sub(r"[\u3000 \t \xa0]", " ", clean_text)
         return clean_text                                               # return str
     
-    def parse_text(self, clean_text) -> list:
+    @staticmethod
+    def parse_text(clean_text) -> list:
         wakati = []
         tagger = MeCab.Tagger()
         nodes = tagger.parseToNode(clean_text)                          # can not save as self.nodes, do not know why
@@ -211,3 +215,83 @@ class JText:
 
         return redundant_ratio
 
+    @staticmethod
+    def download_ner(download: bool = True) -> list[str]:
+        ner_url = "https://raw.githubusercontent.com/stockmarkteam/ner-wikipedia-dataset/refs/heads/main/ner.json"
+        cdir = os.path.dirname(os.path.abspath(__file__))
+        fname = os.path.join(cdir, 'ner.json')
+        if os.path.exists(fname):
+            with open (fname,"r", encoding = "utf-16") as f:
+                data = json.load(f)
+        else:
+            try:
+                # Download the JSON file
+                response = requests.get(ner_url)
+                response.raise_for_status()  # Check for errors in the request
+
+                # Load the JSON data
+                data = response.json()
+            except:
+                data = dict()
+            else:
+                if response.status_code == 200 and download == True:
+                    with open(fname, "w", encoding = "utf-16") as f:
+                        json.dump(data,f)
+                else:
+                    pass
+            
+        # Extract all "name" fields from "entities"
+        entities_list = []
+        for item in data:
+            for entity in item.get("entities", []):
+                entities_list.append(entity["name"])
+                
+        return entities_list
+        
+
+    def get_specificity(self, entities_list: list[str] = None) -> float:
+        if entities_list == None:
+            entities_list = self.download_ner()
+        else:
+            pass
+            
+        ner_dict = {}
+        for entity in entities_list:
+            count = 0
+            start = 0
+            while True:
+                start = self.clean_text.find(entity, start)
+                if start == -1:
+                    break
+                else:
+                    pass
+                count += 1
+                start += 1
+            if count > 0:
+                ner_dict[entity] = count
+            else:
+                pass
+        
+        # drop sub-phrases, such as "京" in "東京都千代田区"
+        sorted_keys = sorted(list(ner_dict.keys()), key = len, reverse = True)
+        filered_keys = []
+        for key in sorted_keys:
+            if not any(key in longer_word for longer_word in filered_keys):
+                filered_keys.append(key)
+        for key in list(ner_dict.keys()):
+            if key not in filered_keys:
+                del ner_dict[key]
+
+        # calculate specificity ratio
+        specificity = 0
+        try:
+            for key in ner_dict.keys():
+                specificity += len(key) * ner_dict[key]             
+        except:
+            pass
+        finally:
+            length = len(self.clean_text)                                   # use simple text length, instead of wakati numbers
+            specific_ratio = specificity/length
+
+        return specific_ratio
+    
